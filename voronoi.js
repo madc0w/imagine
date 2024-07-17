@@ -1,63 +1,89 @@
-let canvas, ctx, imageData;
+const numPoints = 12;
+let itNum = 0;
+let canvas,
+	ctx,
+	lastRenderDate = new Date();
+let points = [];
 
 function load() {
+	console.log('load');
 	canvas = document.getElementById('canvas');
-	canvas.width = innerWidth * 0.92;
-	canvas.height = innerHeight * 0.92;
+	canvas.width = innerWidth * 0.98;
+	canvas.height = innerHeight * 0.98;
 
-	ctx = canvas.getContext('2d');
-	ctx.fillStyle = '#fff';
+	ctx = canvas.getContext('2d', { willReadFrequently: true });
+	ctx.fillStyle = '#004';
 	ctx.fillRect(0, 0, canvas.width, canvas.height);
-	imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+	for (let i = 0; i < numPoints; i++) {
+		points.push({
+			color: hexColor(hsvToRgb(Math.random(), 1, 1)),
+			pos: {
+				x: Math.random() * canvas.width,
+				y: Math.random() * canvas.height,
+			},
+			vel: {
+				x: 4 * (Math.random() - 0.5),
+				y: 4 * (Math.random() - 0.5),
+			},
+		});
+	}
 
 	draw();
 }
 
-function draw() {
+async function draw() {
 	// if (Math.random() < 0.1) {
-	ctx.fillStyle = hexColor(hsvToRgb(Math.random(), 1, 1));
-	ctx.beginPath();
-	ctx.arc(
-		canvas.width * Math.random(),
-		canvas.height * Math.random(),
-		20 + 80 * Math.random(),
-		0,
-		2 * Math.PI
-	);
-	ctx.fill();
-	imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-	// }
+	for (const p of points) {
+		// p.vel.y += 2;
+		// p.vel.x += 2 * (Math.random() - 0.5);
+		p.pos.x += p.vel.x;
+		p.pos.y += p.vel.y;
 
-	for (let x = 0; x < canvas.width; x++) {
-		for (let y = 0; y < canvas.height; y++) {
-			const points = [];
-			// points.push(getPixel(imageData, x, y));
-			for (let x1 = x - 2; x1 <= x + 2; x1++) {
-				for (let y1 = y - 2; y1 <= y + 2; y1++) {
-					if (x1 >= 0 && y1 >= 0 && x1 < canvas.width && y1 < canvas.height) {
-						points.push(getPixel(imageData, x1, y1));
-					}
-				}
-			}
-			const c = {
-				r: 0,
-				b: 0,
-				g: 0,
-			};
-			for (const p of points) {
-				c.r += p.r;
-				c.g += p.g;
-				c.b += p.b;
-			}
-			c.r /= points.length;
-			c.g /= points.length;
-			c.b /= points.length;
-
-			setPixel(imageData, x, y, c);
+		if (p.pos.x < 0 || p.pos.x > canvas.width) {
+			p.vel.x *= -1;
+		}
+		if (p.pos.y < 0 || p.pos.y > canvas.height) {
+			p.vel.y *= -1;
 		}
 	}
 
-	ctx.putImageData(imageData, 0, 0);
+	// const numThreads = 20;
+	// let numFinished = 0;
+	// for (let i = 0; i < numThreads; i++) {
+	// 	setTimeout(() => {
+	// for (
+	// 	let x = (i * canvas.width) / numThreads;
+	// 	x < ((i + 1) * canvas.width) / numThreads;
+	// 	x++
+	// ) {
+	for (let x = 0; x < canvas.width; x++) {
+		for (let y = 0; y < canvas.height; y++) {
+			let minDistPoint = points[0];
+			for (const p of points) {
+				if (distSq(p.pos, { x, y }) < distSq(minDistPoint.pos, { x, y })) {
+					minDistPoint = p;
+				}
+			}
+
+			ctx.fillStyle = minDistPoint.color;
+			ctx.beginPath();
+			ctx.rect(x, y, 1, 1);
+			ctx.fill();
+		}
+		// }
+		// 	numFinished++;
+		// }, 0);
+	}
+
+	// do {
+	// 	await sleep(200);
+	// } while (numFinished < numThreads);
+
+	itNum++;
+	console.log(`iteration ${itNum} took ${new Date() - lastRenderDate} ms`);
+	lastRenderDate = new Date();
+
 	requestAnimationFrame(draw);
 }
 
@@ -132,4 +158,14 @@ function getPixel(imageData, x, y) {
 		b: imageData.data[index + 2],
 		a: imageData.data[index + 3],
 	};
+}
+
+function sleep(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function distSq(p1, p2) {
+	const dx = p1.x - p2.x;
+	const dy = p1.y - p2.y;
+	return dx * dx + dy * dy;
 }
